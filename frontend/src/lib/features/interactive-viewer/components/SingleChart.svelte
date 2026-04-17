@@ -38,10 +38,10 @@
 					
 					if (xStartMin !== undefined && xEndMin !== undefined) {
 						let newMin = typeof xStartMin === 'number' ? xStartMin / 1440 : 0;
-						let newMax = typeof xEndMin === 'number' ? xEndMin / 1440 : 365;
+						let newMax = typeof xEndMin === 'number' ? xEndMin / 1440 : viewerState.spanDays;
 						
 						const currentMin = axis.xmin || 0;
-						const currentMax = axis.xmax || 365;
+						const currentMax = axis.xmax || viewerState.spanDays;
 						// If user swept mouse more than 1 min differences
 						if (Math.abs(currentMin - newMin) > 0.01 || Math.abs(currentMax - newMax) > 0.01) {
 							viewerState.setAxisXBounds(axis.id, newMin, newMax);
@@ -68,7 +68,7 @@
 			const globalInfo = viewerState.globalChartData[axis.id]?.[firstVar];
 			if (globalInfo && globalInfo.x.length > 0) {
 				const points = globalInfo.x.map((x, i) => {
-					return [x * viewerState.timestep, globalInfo.y[i]];
+					return [x, globalInfo.y[i]];
 				});
 				series.push({
 					name: 'BackgroundDataZoom',
@@ -97,7 +97,7 @@
 				const points = dataInfo.x.map((x, i) => {
 					const yVal = dataInfo.y[i];
 					const converted = yVal !== null ? convertValue(yVal, nativeUnit, targetUnit) : null;
-					return [x * viewerState.timestep, converted];
+					return [x, converted];
 				});
 				
 				const displayName = varDef ? varDef.name : varName;
@@ -172,12 +172,12 @@
 				nameTextStyle: { color: mutedColor, fontSize: 13 },
 				scale: false,
 				min: 0,
-				max: 365 * 1440,
+				max: viewerState.spanDays * 1440,
 				axisLabel: {
 					color: mutedColor,
 					formatter: function (value: number) {
-						// Create reference date (Jan 1, 2024 UTC to avoid timezone issues)
-						const date = new Date(Date.UTC(2024, 0, 1, 0, 0, 0));
+						// Create reference date starting from selected global Month
+						const date = new Date(Date.UTC(2023, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0));
 						date.setUTCMinutes(value);
 						
 						const month = date.getUTCMonth() + 1;
@@ -186,7 +186,7 @@
 						const mins = date.getUTCMinutes().toString().padStart(2, '0');
 						
 						const minDay = axis.xmin ?? 0;
-						const maxDay = axis.xmax ?? 365;
+						const maxDay = axis.xmax ?? viewerState.spanDays;
 						const spanDays = maxDay - minDay;
 						
 						if (spanDays > 7.1) {

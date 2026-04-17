@@ -38,6 +38,18 @@
 			}
 		}
 	}
+
+	function validateAndFetch() {
+		const startDate = new Date(2023, viewerState.startMonth - 1, viewerState.startDay);
+		let endDate = new Date(2023, viewerState.endMonth - 1, viewerState.endDay);
+		
+		if (startDate >= endDate) {
+			endDate = new Date(2023, viewerState.startMonth - 1, viewerState.startDay + 1);
+			viewerState.endMonth = endDate.getMonth() + 1;
+			viewerState.endDay = endDate.getDate();
+		}
+		viewerState.fetchGlobalResults().then(() => viewerState.fetchResults());
+	}
 </script>
 
 <div 
@@ -71,8 +83,34 @@
 		</div>
 		<div class="header-controls">
 			<label class="timestep-input">
-				<span>Timestep (min):</span>
-				<input type="number" bind:value={viewerState.timestep} min="1" step="1" />
+				<span>Start:</span>
+				<div class="date-selects">
+					<select bind:value={viewerState.startMonth} onchange={validateAndFetch}>
+						{#each Array.from({length: 12}, (_, i) => i + 1) as m}
+							<option value={m}>{m}월</option>
+						{/each}
+					</select>
+					<select bind:value={viewerState.startDay} onchange={validateAndFetch}>
+						{#each Array.from({length: 31}, (_, i) => i + 1) as d}
+							<option value={d}>{d}일</option>
+						{/each}
+					</select>
+				</div>
+			</label>
+			<label class="timestep-input">
+				<span>End:</span>
+				<div class="date-selects">
+					<select bind:value={viewerState.endMonth} onchange={validateAndFetch}>
+						{#each Array.from({length: 12}, (_, i) => i + 1) as m}
+							<option value={m}>{m}월</option>
+						{/each}
+					</select>
+					<select bind:value={viewerState.endDay} onchange={validateAndFetch}>
+						{#each Array.from({length: 31}, (_, i) => i + 1) as d}
+							<option value={d}>{d}일</option>
+						{/each}
+					</select>
+				</div>
 			</label>
 		</div>
 	</div>
@@ -233,16 +271,20 @@
 		font-weight: 500;
 		font-size: var(--text-sm);
 	}
-	.timestep-input input {
+	.date-selects {
+		display: flex;
+		gap: 4px;
+	}
+	.timestep-input select {
 		width: 60px;
-		padding: 6px 8px;
+		padding: 6px 4px;
 		border: 1px solid #cbd5e1;
 		border-radius: 6px;
 		font-family: inherit;
 		font-size: var(--text-sm);
 		text-align: center;
 	}
-	.timestep-input input:focus {
+	.timestep-input select:focus {
 		outline: none;
 		border-color: var(--accent-primary);
 		box-shadow: 0 0 0 2px rgba(92, 131, 196, 0.2);

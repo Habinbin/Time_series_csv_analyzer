@@ -28,7 +28,9 @@ def get_variables():
             
     return vars_info
 
-def get_downsampled_data(variables: list[str], threshold: int, xmin: float | None = None, xmax: float | None = None):
+import datetime
+
+def get_downsampled_data(variables: list[str], threshold: int, xmin: float | None = None, xmax: float | None = None, csv_start_month: int = 1, csv_end_month: int = 12, csv_start_day: int = 1, csv_end_day: int = 31):
     """
     Reads the requests variables from SQLite and applies LTTB downsampling.
     If requested points < threshold, no downsampling is needed.
@@ -47,14 +49,19 @@ def get_downsampled_data(variables: list[str], threshold: int, xmin: float | Non
         conn.close()
         return {}
         
-    query = f"SELECT {', '.join([f'{chr(34)}{v}{chr(34)}' for v in safe_vars])} FROM ashpb_pv_ess_1yr"
-    df = pd.read_sql(query, conn)
-    conn.close()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM ashpb_pv_ess_1yr")
+    n_total = cursor.fetchone()[0]
     
-    n_total = len(df)
+    # Calculate span in days between start and end date (inclusive) using a non-leap year (2023)
+    try:
+        st_date = datetime.datetime(2023, csv_start_month, csv_start_day)
+        en_date = datetime.datetime(2023, csv_end_month, csv_end_day)
+        span_days = max(1, (en_date - st_date).days + 1)
+    except ValueError:
+        span_days = 365 # Default fallback on invalid date
     
-    # Assume the simulation is exactly 1 year long (365 days) regardless of point resolution
-    points_per_day = n_total / 365.0
+    points_per_day = n_total / float(span_days)
     
     min_idx = int(xmin * points_per_day) if xmin is not None else 0
     max_idx = int(xmax * points_per_day) if xmax is not None else n_total
@@ -64,9 +71,15 @@ def get_downsampled_data(variables: list[str], threshold: int, xmin: float | Non
     max_idx = min(n_total, max_idx)
     
     if min_idx < max_idx:
-        df = df.iloc[min_idx:max_idx]
+        # Avoid loading everything! Load only targeted rowids (1-indexed in SQLite)
+        query = f"SELECT rowid, {', '.join([f'{chr(34)}{v}{chr(34)}' for v in safe_vars])} FROM ashpb_pv_ess_1yr WHERE rowid > {min_idx} AND rowid <= {max_idx}"
+        df = pd.read_sql(query, conn)
     else:
-        df = df.iloc[0:0]
+        # Load empty dataframe schema
+        query = f"SELECT rowid, {', '.join([f'{chr(34)}{v}{chr(34)}' for v in safe_vars])} FROM ashpb_pv_ess_1yr LIMIT 0"
+        df = pd.read_sql(query, conn)
+
+    conn.close()
 
     n_rows = len(df)
     results = {}
@@ -81,13 +94,16 @@ def get_downsampled_data(variables: list[str], threshold: int, xmin: float | Non
     # The frontend expects X axis values as minutes.
     minutes_per_point = 1440.0 / points_per_day
     
-    # Time array (X axis) proxy - convert raw index to conceptual simulation minutes
-    x = np.arange(min_idx, max_idx, dtype=np.float64) * minutes_per_point
+    # Time array (X axis) proxy - convert rowid to conceptual simulation minutes
+    if n_rows > 0:
+        x = (df['rowid'].values - 1).astype(np.float64) * minutes_per_point
+    else:
+        x = np.array([], dtype=np.float64)
     
     for col in safe_vars:
         y = df[col].astype(float).values
-        # Handle NaNs which LTTB doesn't like
-        mask = ~np.isnan(y)
+        # @python-data-analysis: Handle NaNs and Infs numerically to prevent JSONResponse breakage
+        mask = np.isfinite(y)
         x_clean = x[mask]
         y_clean = y[mask]
         

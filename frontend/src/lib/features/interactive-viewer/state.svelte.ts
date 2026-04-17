@@ -26,7 +26,16 @@ export class ViewerState {
 	availableVariables = $state<VariableInfo[]>([]);
 	axes = $state<ChartAxis[]>([]);
 	loading = $state(false);
-	timestep = $state(1);
+	startMonth = $state(1);
+	startDay = $state(1);
+	endMonth = $state(12);
+	endDay = $state(31);
+
+	get spanDays() {
+		const startDate = Date.UTC(2023, this.startMonth - 1, this.startDay);
+		const endDate = Date.UTC(2023, this.endMonth - 1, this.endDay);
+		return Math.max(1, (endDate - startDate) / (1000 * 3600 * 24) + 1);
+	}
 
 	chartData = $state<Record<string, Record<string, {x: number[], y: (number | null)[]}>>>({});
 	globalChartData = $state<Record<string, Record<string, {x: number[], y: (number | null)[]}>>>({});
@@ -51,7 +60,11 @@ export class ViewerState {
 						variables: ax.variables,
 						threshold: 1000,
 						xmin: null,
-						xmax: null
+						xmax: null,
+						csv_start_month: this.startMonth,
+						csv_start_day: this.startDay,
+						csv_end_month: this.endMonth,
+						csv_end_day: this.endDay
 					}
 				});
 				if (data && typeof data === 'object' && 'data' in data) {
@@ -91,7 +104,11 @@ export class ViewerState {
 						variables: ax.variables,
 						threshold: 1200,
 						xmin: ax.xmin,
-						xmax: ax.xmax
+						xmax: ax.xmax,
+						csv_start_month: this.startMonth,
+						csv_start_day: this.startDay,
+						csv_end_month: this.endMonth,
+						csv_end_day: this.endDay
 					}
 				});
 				if (data && typeof data === 'object' && 'data' in data) {
