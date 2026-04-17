@@ -1,0 +1,18 @@
+# Node
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
+# Python
+backend/__pycache__/
+backend/**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Git
+.git/
+.gitignore
+
+# 개발용
+**/.env.local
+**/README.md
