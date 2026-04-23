@@ -266,6 +266,7 @@
 						return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 					}
 				},
+				axisLine: { show: true },
 				axisTick: { show: true },
 				splitLine: { show: true, lineStyle: { color: gridColor } }
 			},
