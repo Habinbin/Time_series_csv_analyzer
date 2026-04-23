@@ -197,7 +197,7 @@
 				data: legendData,
 				textStyle: { color: mutedColor, fontWeight: 500 },
 				type: 'plain',
-				top: 5,
+				top: 12,
 				width: '80%',
 				height: 55,
 				icon: 'circle',
