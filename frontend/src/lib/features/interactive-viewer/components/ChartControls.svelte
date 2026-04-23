@@ -130,7 +130,7 @@
 						class="color-circle"
 						style="background: {axis.variableColors?.[v]}"
 						onclick={() => viewerState.cycleAxisVariableColor(axis.id, v)}
-						title="Cycle line color"
+						title="Change line color"
 					></button>
 
 					{#if axis.chartType === 'line'}
@@ -141,7 +141,7 @@
 						<button
 							class="cycle-style-btn"
 							onclick={() => viewerState.cycleAxisVariableLineStyle(axis.id, v)}
-							title="Cycle line style">{lineLabel}</button
+							title="Change line style">{lineLabel}</button
 						>
 					{/if}
 
