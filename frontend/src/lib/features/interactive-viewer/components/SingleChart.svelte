@@ -1,3 +1,10 @@
+<script lang="ts" module>
+	function focusInput(node: HTMLInputElement) {
+		node.focus();
+		node.select();
+	}
+</script>
+
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import * as echarts from 'echarts';
@@ -88,6 +95,13 @@
 					symbol: chartType === 'scatter' ? customMarker : undefined,
 					symbolSize: chartType === 'scatter' ? 5 : undefined,
 					areaStyle: chartType === 'area' ? { opacity: 0.2 } : undefined,
+					sampling: chartType === 'scatter' ? undefined : 'lttb',
+					large: true,
+					largeThreshold: 600,
+					progressiveThreshold: 600,
+					progressive: 400,
+					hoverAnimation: false, // 최적화: 호버 시 점 커지는 애니메이션 끄기
+					emphasis: { disabled: true }, // 최적화: 호버 시 다른 시리즈 투명해지는 효과 끄기
 					data: points,
 					connectNulls: false,
 					lineStyle: {
@@ -119,13 +133,22 @@
 			return { month, day, hours, mins };
 		}
 
-		const option: echarts.EChartsOption = {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const option: any = {
 			backgroundColor: 'transparent',
 			tooltip: {
 				trigger: 'axis',
-				axisPointer: { type: 'cross' },
+				triggerOn: 'mousemove',
+				throttle: 100, // 최적화: 너무 낮으면 호버시 버벅임 발생
+				axisPointer: {
+					type: 'line', // 'cross'보다 'line'이 연산량이 훨씬 적음
+					animation: false,
+					lineStyle: { color: mutedColor, width: 1, type: 'dashed' }
+				},
 				backgroundColor: tooltipBg,
 				borderColor: tooltipBorder,
+				enterable: false,
+				confine: true,
 				formatter: function (params: any) {
 					if (!params || !params.length) return '';
 					const valX = params[0].value[0];
@@ -152,8 +175,9 @@
 				show: true,
 				data: legendData,
 				textStyle: { color: mutedColor, fontWeight: 500 },
-				type: 'scroll',
+				type: 'plain',
 				top: 5,
+				width: '80%',
 				height: 55,
 				icon: 'circle',
 				itemGap: 20
@@ -179,7 +203,14 @@
 					formatter: function (value: number) {
 						// Create reference date starting from selected global Month
 						const date = new Date(
-							Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
+							Date.UTC(
+								viewerState.startYear,
+								viewerState.startMonth - 1,
+								viewerState.startDay,
+								0,
+								0,
+								0
+							)
 						);
 						date.setUTCMinutes(value);
 
@@ -234,24 +265,25 @@
 				splitLine: { show: true, lineStyle: { color: gridColor } }
 			},
 			dataZoom: [
-			{
-				type: 'inside',
-				xAxisIndex: 0,
-				startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
-				endValue:   axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
-			},
-			{
-				type: 'slider',
-				xAxisIndex: 0,
-				bottom: 20,
-				height: 25,
-				borderColor: 'transparent',
-				textStyle: { color: mutedColor },
-				fillerColor: 'rgba(99,102,241,0.1)',
-				startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
-				endValue:   axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
-			}
-		],
+				{
+					type: 'inside',
+					xAxisIndex: 0,
+					startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
+					endValue: axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
+				},
+				{
+					type: 'slider',
+					xAxisIndex: 0,
+					bottom: 20,
+					height: 25,
+					borderColor: 'transparent',
+					textStyle: { color: mutedColor },
+					fillerColor: 'rgba(99,102,241,0.1)',
+					moveHandleSize: 0,
+					startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
+					endValue: axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
+				}
+			],
 			series
 		};
 		console.log('CHART UPDATE OPTION:', series);
@@ -276,7 +308,7 @@
 						// Convert from minutes to 0–1 ratio
 						const totalMinutes = viewerState.spanDays * 1440;
 						let newMin = typeof xStartMin === 'number' ? xStartMin / totalMinutes : 0;
-						let newMax = typeof xEndMin  === 'number' ? xEndMin  / totalMinutes : 1;
+						let newMax = typeof xEndMin === 'number' ? xEndMin / totalMinutes : 1;
 
 						const currentMin = axis.xmin ?? 0;
 						const currentMax = axis.xmax ?? 1;
@@ -322,11 +354,11 @@
 
 		const isSvg = type === 'svg';
 		const hiddenChart = echarts.init(hiddenDiv, undefined, { renderer: isSvg ? 'svg' : 'canvas' });
-		
+
 		const opt = chartInstance!.getOption() as any;
 		opt.animation = false;
 		opt.backgroundColor = isSvg ? 'transparent' : '#ffffff';
-		
+
 		if (opt.dataZoom) {
 			opt.dataZoom = opt.dataZoom.filter((dz: any) => dz.type !== 'slider');
 		}
@@ -343,7 +375,11 @@
 			const svgStr = hiddenChart.renderToSVGString();
 			blob = new Blob([svgStr], { type: 'image/svg+xml' });
 		} else {
-			const dataUrl = hiddenChart.getDataURL({ type: 'png', pixelRatio: 300 / 72, backgroundColor: '#fff' });
+			const dataUrl = hiddenChart.getDataURL({
+				type: 'png',
+				pixelRatio: 300 / 72,
+				backgroundColor: '#fff'
+			});
 			const res = await fetch(dataUrl);
 			blob = await res.blob();
 		}
@@ -358,10 +394,12 @@
 		try {
 			const handle = await (window as any).showSaveFilePicker({
 				suggestedName: name,
-				types: [{
-					description: `${type.toUpperCase()} Image`,
-					accept: { [`image/${type}`]: [`.${type}`] }
-				}]
+				types: [
+					{
+						description: `${type.toUpperCase()} Image`,
+						accept: { [`image/${type}`]: [`.${type}`] }
+					}
+				]
 			});
 			const writable = await handle.createWritable();
 			const blob = await generateExportBlob(type);
@@ -400,7 +438,9 @@
 			}
 			const item = new ClipboardItem({ 'image/png': blob });
 			await navigator.clipboard.write([item]);
-			setTimeout(() => { isCopying = false; }, 1500);
+			setTimeout(() => {
+				isCopying = false;
+			}, 1500);
 		} catch (err) {
 			console.error('Failed to copy image: ', err);
 			alert('Clipboard copy failed. Your browser might not support this feature.');
@@ -423,14 +463,45 @@
 	></div>
 	{#if axis.variables.length > 0}
 		<div class="export-buttons">
-			<button class="export-btn icon-btn" onclick={copyChart} title="Copy as PNG to Clipboard" aria-label="Copy to Clipboard">
+			<button
+				class="export-btn icon-btn"
+				onclick={copyChart}
+				title="Copy as PNG to Clipboard"
+				aria-label="Copy to Clipboard"
+			>
 				{#if isCopying}
-					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						style="color: #10b981;"><polyline points="20 6 9 17 4 12"></polyline></svg
+					>
 				{:else}
-					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path
+							d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+						></path></svg
+					>
 				{/if}
 			</button>
-			<button class="export-btn" onclick={() => exportChart('png')} title="Save as PNG (300 DPI)">PNG</button>
+			<button class="export-btn" onclick={() => exportChart('png')} title="Save as PNG (300 DPI)"
+				>PNG</button
+			>
 			<button class="export-btn" onclick={() => exportChart('svg')} title="Save as SVG">SVG</button>
 		</div>
 	{/if}
@@ -459,13 +530,6 @@
 		/>
 	{/if}
 </div>
-
-<script lang="ts" module>
-	function focusInput(node: HTMLInputElement) {
-		node.focus();
-		node.select();
-	}
-</script>
 
 <style>
 	.chart-wrapper {
@@ -545,7 +609,9 @@
 		padding: 4px 8px;
 		font-size: 13px;
 		color: var(--text-color, #1e293b);
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		box-shadow:
+			0 4px 6px -1px rgba(0, 0, 0, 0.1),
+			0 2px 4px -1px rgba(0, 0, 0, 0.06);
 		outline: none;
 		min-width: 150px;
 		text-align: center;

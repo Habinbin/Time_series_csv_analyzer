@@ -70,7 +70,7 @@ export class ViewerState {
 				const { data, error } = await api.POST("/api/v1/simulation/results", {
 					body: {
 						variables: ax.variables,
-						threshold: 1000,
+						threshold: 600,
 						xmin: null,
 						xmax: null,
 						csv_start_year: this.startYear,
@@ -122,10 +122,16 @@ export class ViewerState {
 					return;
 				}
 				
+				// Dynamic threshold: fewer points for wide view, more for zoomed-in
+				const zoomRatio = (ax.xmax !== null && ax.xmin !== null)
+					? Math.max(0.01, (ax.xmax - ax.xmin) / this.spanDays)
+					: 1.0;
+				const dynThreshold = Math.round(Math.min(1200, Math.max(400, 1200 * zoomRatio)));
+
 				const { data, error } = await api.POST("/api/v1/simulation/results", {
 					body: {
 						variables: ax.variables,
-						threshold: 1200,
+						threshold: dynThreshold,
 						xmin: ax.xmin,
 						xmax: ax.xmax,
 						csv_start_year: this.startYear,

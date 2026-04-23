@@ -117,8 +117,8 @@
 			<div class="var-row">
 				<div class="var-main">
 					<span
-						class="var-name"
-						title={varDef ? varDef.name.replace(/Consumption/gi, 'Energy Use') : v}
+						class="var-name has-tooltip"
+						data-tooltip={varDef ? varDef.name.replace(/Consumption/gi, 'Energy Use') : v}
 						>{varDef ? varDef.name.replace(/Consumption/gi, 'Energy Use') : v}</span
 					>
 				</div>
@@ -127,10 +127,11 @@
 				<div class="var-toggles">
 					<!-- Color Cycle Button -->
 					<button
-						class="color-circle"
+						class="color-circle has-tooltip"
 						style="background: {axis.variableColors?.[v]}"
 						onclick={() => viewerState.cycleAxisVariableColor(axis.id, v)}
-						title="Change line color"
+						aria-label="Change color"
+						data-tooltip="Change color"
 					></button>
 
 					{#if axis.chartType === 'line'}
@@ -139,9 +140,9 @@
 							axis.variableLineStyles?.[v] || 'solid'
 						]}
 						<button
-							class="cycle-style-btn"
+							class="cycle-style-btn has-tooltip"
 							onclick={() => viewerState.cycleAxisVariableLineStyle(axis.id, v)}
-							title="Change line style">{lineLabel}</button
+							data-tooltip="Change line style">{lineLabel}</button
 						>
 					{/if}
 
@@ -151,9 +152,9 @@
 							axis.variableMarkers?.[v] || 'circle'
 						]}
 						<button
-							class="cycle-style-btn"
+							class="cycle-style-btn has-tooltip"
 							onclick={() => viewerState.cycleAxisVariableMarker(axis.id, v)}
-							title="Cycle marker style">{markerLabel}</button
+							data-tooltip="Change marker style">{markerLabel}</button
 						>
 					{/if}
 				</div>
@@ -617,5 +618,51 @@
 	}
 	.cycle-style-btn:hover {
 		background: #e2e8f0;
+	}
+
+	/* ── Custom Tooltip ── */
+	.has-tooltip {
+		position: relative;
+	}
+	.has-tooltip::after {
+		content: attr(data-tooltip);
+		position: absolute;
+		bottom: calc(100% + 6px);
+		left: 50%;
+		transform: translateX(-50%) scale(0.92);
+		white-space: nowrap;
+		background: rgba(15, 23, 42, 0.88);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+		color: #f1f5f9;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 1.4;
+		padding: 4px 9px;
+		border-radius: 6px;
+		border: 1px solid rgba(99, 102, 241, 0.25);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.15s ease, transform 0.15s ease;
+		z-index: 999;
+	}
+	.has-tooltip::before {
+		content: '';
+		position: absolute;
+		bottom: calc(100% + 1px);
+		left: 50%;
+		transform: translateX(-50%);
+		border: 5px solid transparent;
+		border-top-color: rgba(15, 23, 42, 0.88);
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.15s ease;
+		z-index: 999;
+	}
+	.has-tooltip:hover::after,
+	.has-tooltip:hover::before {
+		opacity: 1;
+		transform: translateX(-50%) scale(1);
 	}
 </style>

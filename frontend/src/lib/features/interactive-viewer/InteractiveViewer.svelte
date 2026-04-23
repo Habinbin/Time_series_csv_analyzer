@@ -172,8 +172,8 @@
 		--leading-h: 1.2;
 
 		/* Accent */
-		--accent-primary: #5c83c4; /* Soft muted blue */
-		--accent-hover: #4a6fa8;
+		--accent-primary: #4f46e5; /* Indigo 600 */
+		--accent-hover: #4338ca; /* Indigo 700 */
 		--danger-color: #ef4444;
 	}
 

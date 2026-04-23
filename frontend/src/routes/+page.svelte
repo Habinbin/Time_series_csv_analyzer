@@ -1,5 +1,6 @@
 <script lang="ts">
 	import InteractiveViewer from '$lib/features/interactive-viewer/InteractiveViewer.svelte';
+	import { Activity } from 'lucide-svelte';
 </script>
 
 <svelte:head>
@@ -9,23 +10,7 @@
 <main>
 	<header class="app-header">
 		<div class="logo">
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="brand-icon">
-				<path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#3b82f6" />
-				<path
-					d="M2 17L12 22L22 17"
-					stroke="#3b82f6"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				/>
-				<path
-					d="M2 12L12 17L22 12"
-					stroke="#3b82f6"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				/>
-			</svg>
+			<Activity color="#4f46e5" size={28} strokeWidth={2.5} class="brand-icon" />
 			<h1>Time Series Data Visualizer</h1>
 		</div>
 	</header>
