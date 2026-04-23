@@ -38,7 +38,7 @@
 		const series: any[] = [];
 		const legendData: string[] = [];
 		const uniqueUnits = new Set<string>();
-		const refDate = new Date(Date.UTC(viewerState.startYear, 0, 1, 0, 0, 0));
+		const baseTimeMs = Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0);
 
 		// Add global background series to preserve full year shape in dataZoom
 		if (axis.variables.length > 0) {
@@ -46,7 +46,7 @@
 			const globalInfo = viewerState.globalChartData[axis.id]?.[firstVar];
 			if (globalInfo && globalInfo.x.length > 0) {
 				const points = globalInfo.x.map((x, i) => {
-					return [x, globalInfo.y[i]];
+					return [baseTimeMs + x * 60000, globalInfo.y[i]];
 				});
 				series.push({
 					id: 'BackgroundDataZoom',
@@ -79,7 +79,7 @@
 				const points = dataInfo.x.map((x, i) => {
 					const yVal = dataInfo.y[i];
 					const converted = yVal !== null ? convertValue(yVal, nativeUnit, targetUnit) : null;
-					return [x, converted];
+					return [baseTimeMs + x * 60000, converted];
 				});
 
 				const displayName = varDef ? varDef.name : varName;
@@ -128,15 +128,29 @@
 		const unitStr = uniqueUnits.size === 1 ? ` [${Array.from(uniqueUnits)[0]}]` : '';
 
 		function getFormattedTime(value: number) {
-			const date = new Date(
-				Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
-			);
-			date.setUTCMinutes(value);
+			const date = new Date(value);
 			const month = date.getUTCMonth() + 1;
 			const day = date.getUTCDate();
 			const hours = date.getUTCHours().toString().padStart(2, '0');
 			const mins = date.getUTCMinutes().toString().padStart(2, '0');
 			return { month, day, hours, mins };
+		}
+
+		const minRatio = axis.xmin ?? 0;
+		const maxRatio = axis.xmax ?? 1;
+		const spanDays = (maxRatio - minRatio) * viewerState.spanDays;
+
+		let xAxisInterval: number | undefined = undefined;
+		if (spanDays >= 90) {
+			xAxisInterval = undefined;
+		} else if (spanDays >= 21) {
+			xAxisInterval = 10080 * 60000;
+		} else if (spanDays >= 3) {
+			xAxisInterval = 1440 * 60000;
+		} else if (spanDays >= 2) {
+			xAxisInterval = 360 * 60000;
+		} else {
+			xAxisInterval = 240 * 60000;
 		}
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -197,43 +211,27 @@
 				containLabel: false
 			},
 			xAxis: {
-				type: 'value',
+				type: 'time',
 				name: 'Time',
 				nameLocation: 'end',
 				nameGap: 10,
 				nameTextStyle: { color: mutedColor, fontSize: 13 },
-				scale: false,
-				min: 0,
-				max: viewerState.spanDays * 1440,
+				min: baseTimeMs,
+				max: baseTimeMs + viewerState.spanDays * 1440 * 60000,
+				interval: xAxisInterval,
 				axisLabel: {
 					color: mutedColor,
 					formatter: function (value: number) {
-						// Create reference date starting from selected global Month
-						const date = new Date(
-							Date.UTC(
-								viewerState.startYear,
-								viewerState.startMonth - 1,
-								viewerState.startDay,
-								0,
-								0,
-								0
-							)
-						);
-						date.setUTCMinutes(value);
-
+						const date = new Date(value);
 						const month = date.getUTCMonth() + 1;
 						const day = date.getUTCDate();
 						const hours = date.getUTCHours().toString().padStart(2, '0');
 						const mins = date.getUTCMinutes().toString().padStart(2, '0');
 
-						const minDay = axis.xmin ?? 0;
-						const maxDay = axis.xmax ?? viewerState.spanDays;
-						const spanDays = maxDay - minDay;
-
-						if (spanDays > 7.1) {
+						if (spanDays >= 3) {
 							return `${month}/${day}`;
 						} else {
-							return `${month}/${day} ${hours}:${mins}`;
+							return `${month}/${day}\n${hours}:${mins}`;
 						}
 					}
 				},
@@ -275,8 +273,8 @@
 				{
 					type: 'inside',
 					xAxisIndex: 0,
-					startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
-					endValue: axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
+					startValue: axis.xmin !== null ? baseTimeMs + axis.xmin * viewerState.spanDays * 1440 * 60000 : undefined,
+					endValue: axis.xmax !== null ? baseTimeMs + axis.xmax * viewerState.spanDays * 1440 * 60000 : undefined
 				},
 				{
 					type: 'slider',
@@ -287,8 +285,8 @@
 					textStyle: { color: mutedColor },
 					fillerColor: 'rgba(99,102,241,0.1)',
 					moveHandleSize: 0,
-					startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
-					endValue: axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
+					startValue: axis.xmin !== null ? baseTimeMs + axis.xmin * viewerState.spanDays * 1440 * 60000 : undefined,
+					endValue: axis.xmax !== null ? baseTimeMs + axis.xmax * viewerState.spanDays * 1440 * 60000 : undefined
 				}
 			],
 			series
@@ -308,22 +306,28 @@
 					const opt = chartInstance?.getOption() as any;
 					if (!opt || !opt.dataZoom || opt.dataZoom.length === 0) return;
 
-					let xStartMin = opt.dataZoom[0].startValue ?? opt.dataZoom[0].start;
-					let xEndMin = opt.dataZoom[0].endValue ?? opt.dataZoom[0].end;
+					let startVal = opt.dataZoom[0].startValue;
+					let endVal = opt.dataZoom[0].endValue;
 
-					if (xStartMin !== undefined && xEndMin !== undefined) {
-						// Convert from minutes to 0–1 ratio
-						const totalMinutes = viewerState.spanDays * 1440;
-						let newMin = typeof xStartMin === 'number' ? xStartMin / totalMinutes : 0;
-						let newMax = typeof xEndMin === 'number' ? xEndMin / totalMinutes : 1;
+					let newMin: number;
+					let newMax: number;
 
-						const currentMin = axis.xmin ?? 0;
-						const currentMax = axis.xmax ?? 1;
-						// If user swept mouse more than 0.01 ratio differences
-						if (Math.abs(currentMin - newMin) > 0.001 || Math.abs(currentMax - newMax) > 0.001) {
-							viewerState.setAxisXBounds(axis.id, newMin, newMax);
-							viewerState.fetchResults();
-						}
+					if (startVal !== undefined && endVal !== undefined) {
+						const currentBaseTimeMs = Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0);
+						const totalMs = viewerState.spanDays * 1440 * 60000;
+						newMin = (startVal - currentBaseTimeMs) / totalMs;
+						newMax = (endVal - currentBaseTimeMs) / totalMs;
+					} else {
+						newMin = (opt.dataZoom[0].start || 0) / 100;
+						newMax = (opt.dataZoom[0].end || 100) / 100;
+					}
+
+					const currentMin = axis.xmin ?? 0;
+					const currentMax = axis.xmax ?? 1;
+					// If user swept mouse more than 0.01 ratio differences
+					if (Math.abs(currentMin - newMin) > 0.001 || Math.abs(currentMax - newMax) > 0.001) {
+						viewerState.setAxisXBounds(axis.id, newMin, newMax);
+						viewerState.fetchResults();
 					}
 				}, 400);
 			});

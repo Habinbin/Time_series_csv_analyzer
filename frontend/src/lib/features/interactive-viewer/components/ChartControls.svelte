@@ -19,8 +19,20 @@
 			: vars
 	);
 
-	function dayToDateStr(dayValue: number | null): string {
-		if (dayValue === null || isNaN(dayValue)) return '';
+	let globalStartDateStr = $derived.by(() => {
+		const date = new Date(Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0));
+		return date.toISOString().split('T')[0];
+	});
+
+	let globalEndDateStr = $derived.by(() => {
+		const date = new Date(Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0));
+		date.setUTCMinutes(viewerState.spanDays * 1440);
+		return date.toISOString().split('T')[0];
+	});
+
+	function dayToDateStr(ratioValue: number | null): string {
+		if (ratioValue === null || isNaN(ratioValue)) return '';
+		const dayValue = ratioValue * viewerState.spanDays;
 		const date = new Date(
 			Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
 		);
@@ -37,7 +49,8 @@
 		const baseDate = new Date(
 			Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
 		);
-		return ((targetDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24)).toString();
+		const diffDays = (targetDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24);
+		return (diffDays / viewerState.spanDays).toString();
 	}
 
 	function selectVar(raw_col: string) {
@@ -200,6 +213,8 @@
 					lang="en"
 					class="has-tooltip"
 					title=""
+					min={globalStartDateStr}
+					max={globalEndDateStr}
 					data-tooltip="Select start date"
 					value={dayToDateStr(axis.xmin)}
 					onchange={(e) => {
@@ -218,6 +233,8 @@
 					lang="en"
 					class="has-tooltip"
 					title=""
+					min={globalStartDateStr}
+					max={globalEndDateStr}
 					data-tooltip="Select end date"
 					value={dayToDateStr(axis.xmax)}
 					onchange={(e) => {
