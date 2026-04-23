@@ -186,6 +186,38 @@
 		color: var(--text-light);
 	}
 
+	/* ── Custom Global Tooltip ── */
+	:global(.has-tooltip) {
+		position: relative;
+	}
+	:global(.has-tooltip::after) {
+		content: attr(data-tooltip);
+		position: absolute;
+		bottom: calc(100% + 6px);
+		left: 50%;
+		transform: translateX(-50%) scale(0.92);
+		white-space: nowrap;
+		background: rgba(15, 23, 42, 0.88);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+		color: #f1f5f9;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 1.4;
+		padding: 4px 9px;
+		border-radius: 6px;
+		border: 1px solid rgba(99, 102, 241, 0.25);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.15s ease, transform 0.15s ease;
+		z-index: 999;
+	}
+	:global(.has-tooltip:hover::after) {
+		opacity: 1;
+		transform: translateX(-50%) scale(1);
+	}
+
 	.viewer-container {
 		display: flex;
 		flex-direction: column;

@@ -24,7 +24,7 @@
 		box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 		border: 1px solid #e2e8f0;
 		margin: 16px 32px;
-		overflow: hidden;
+		overflow: visible;
 		align-items: stretch;
 	}
 	.axis-config {

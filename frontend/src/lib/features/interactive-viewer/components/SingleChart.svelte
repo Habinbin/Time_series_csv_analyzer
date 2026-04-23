@@ -49,6 +49,7 @@
 					return [x, globalInfo.y[i]];
 				});
 				series.push({
+					id: 'BackgroundDataZoom',
 					name: 'BackgroundDataZoom',
 					type: 'line',
 					sampling: 'lttb',
@@ -93,11 +94,12 @@
 				legendData.push(itemName);
 
 				series.push({
+					id: itemName,
 					name: itemName,
 					type: chartType === 'area' ? 'line' : chartType,
 					showSymbol: chartType === 'scatter',
 					symbol: chartType === 'scatter' ? customMarker : undefined,
-					symbolSize: chartType === 'scatter' ? 5 : undefined,
+					symbolSize: chartType === 'scatter' ? (['circle', 'rect'].includes(customMarker) ? 4 : 5) : undefined,
 					areaStyle: chartType === 'area' ? { opacity: 0.2 } : undefined,
 					sampling: chartType === 'scatter' ? undefined : 'lttb',
 					large: true,
@@ -109,7 +111,7 @@
 					data: points,
 					connectNulls: false,
 					lineStyle: {
-						width: 1.5,
+						width: chartType === 'area' ? 0 : 1.5,
 						type: customStyle
 					},
 					itemStyle: { color: customColor }
@@ -139,6 +141,7 @@
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const option: any = {
+			animation: false,
 			backgroundColor: 'transparent',
 			tooltip: {
 				trigger: 'axis',
@@ -468,9 +471,9 @@
 	{#if axis.variables.length > 0}
 		<div class="export-buttons">
 			<button
-				class="export-btn icon-btn"
+				class="export-btn icon-btn has-tooltip"
 				onclick={copyChart}
-				title="Copy as PNG to Clipboard"
+				data-tooltip="Copy as PNG to Clipboard"
 				aria-label="Copy to Clipboard"
 			>
 				{#if isCopying}
@@ -503,10 +506,10 @@
 					>
 				{/if}
 			</button>
-			<button class="export-btn" onclick={() => exportChart('png')} title="Save as PNG (300 DPI)"
+			<button class="export-btn has-tooltip" onclick={() => exportChart('png')} data-tooltip="Save as PNG (300 DPI)"
 				>PNG</button
 			>
-			<button class="export-btn" onclick={() => exportChart('svg')} title="Save as SVG">SVG</button>
+			<button class="export-btn has-tooltip" onclick={() => exportChart('svg')} data-tooltip="Save as SVG">SVG</button>
 		</div>
 	{/if}
 
@@ -541,7 +544,7 @@
 		width: 100%;
 		height: 480px;
 		border-radius: 12px;
-		overflow: hidden;
+		overflow: visible;
 		transition: all 0.3s;
 		display: flex;
 		flex-direction: column;

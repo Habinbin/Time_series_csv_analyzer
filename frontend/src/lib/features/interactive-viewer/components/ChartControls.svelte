@@ -93,7 +93,7 @@
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<li class="dropdown-item" onmousedown={() => selectVar(v.raw_col)}>
-						<span class="dropdown-item-name" title={v.name}>{v.name}</span>
+						<span class="dropdown-item-name has-tooltip" data-tooltip={v.name}>{v.name}</span>
 						{#if v.unit}
 							<span class="dropdown-item-unit">[{v.unit}]</span>
 						{/if}
@@ -175,12 +175,12 @@
 							{/each}
 						</select>
 					{:else if nativeUnit}
-						<span class="unit-badge" title={nativeUnit}>[{nativeUnit}]</span>
+						<span class="unit-badge has-tooltip" data-tooltip={nativeUnit}>[{nativeUnit}]</span>
 					{/if}
 				</div>
 
 				<!-- Remove Action -->
-				<button class="chip-remove" title="Remove variable" onclick={() => removeVariable(v)}
+				<button class="chip-remove has-tooltip" data-tooltip="Remove variable" onclick={() => removeVariable(v)}
 					>×</button
 				>
 			</div>
@@ -198,6 +198,9 @@
 					id="xmin-{axis.id}"
 					type="date"
 					lang="en"
+					class="has-tooltip"
+					title=""
+					data-tooltip="Select start date"
 					value={dayToDateStr(axis.xmin)}
 					onchange={(e) => {
 						const val = (e.currentTarget as HTMLInputElement).value;
@@ -213,6 +216,9 @@
 					id="xmax-{axis.id}"
 					type="date"
 					lang="en"
+					class="has-tooltip"
+					title=""
+					data-tooltip="Select end date"
 					value={dayToDateStr(axis.xmax)}
 					onchange={(e) => {
 						const val = (e.currentTarget as HTMLInputElement).value;
@@ -620,35 +626,4 @@
 		background: #e2e8f0;
 	}
 
-	/* ── Custom Tooltip ── */
-	.has-tooltip {
-		position: relative;
-	}
-	.has-tooltip::after {
-		content: attr(data-tooltip);
-		position: absolute;
-		bottom: calc(100% + 6px);
-		left: 50%;
-		transform: translateX(-50%) scale(0.92);
-		white-space: nowrap;
-		background: rgba(15, 23, 42, 0.88);
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-		color: #f1f5f9;
-		font-size: 11px;
-		font-weight: 500;
-		line-height: 1.4;
-		padding: 4px 9px;
-		border-radius: 6px;
-		border: 1px solid rgba(99, 102, 241, 0.25);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-		pointer-events: none;
-		opacity: 0;
-		transition: opacity 0.15s ease, transform 0.15s ease;
-		z-index: 999;
-	}
-	.has-tooltip:hover::after {
-		opacity: 1;
-		transform: translateX(-50%) scale(1);
-	}
 </style>
