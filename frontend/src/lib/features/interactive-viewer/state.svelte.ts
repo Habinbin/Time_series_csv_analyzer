@@ -20,25 +20,31 @@ export type ChartAxis = {
 	ymax: number | null;
 	xmin: number | null;
 	xmax: number | null;
+	customYLabel?: string;
 };
 
 export class ViewerState {
 	availableVariables = $state<VariableInfo[]>([]);
 	axes = $state<ChartAxis[]>([]);
 	loading = $state(false);
+	startYear = $state(2025);
 	startMonth = $state(1);
 	startDay = $state(1);
+	endYear = $state(2025);
 	endMonth = $state(12);
 	endDay = $state(31);
 
 	get spanDays() {
-		const startDate = Date.UTC(2023, this.startMonth - 1, this.startDay);
-		const endDate = Date.UTC(2023, this.endMonth - 1, this.endDay);
+		const startDate = Date.UTC(this.startYear, this.startMonth - 1, this.startDay);
+		const endDate = Date.UTC(this.endYear, this.endMonth - 1, this.endDay);
 		return Math.max(1, (endDate - startDate) / (1000 * 3600 * 24) + 1);
 	}
 
 	chartData = $state<Record<string, Record<string, {x: number[], y: (number | null)[]}>>>({});
 	globalChartData = $state<Record<string, Record<string, {x: number[], y: (number | null)[]}>>>({});
+
+	private fetchAbortController: AbortController | null = null;
+	private globalFetchAbortController: AbortController | null = null;
 
 	constructor() {
 		// Initialize with one empty axis
@@ -46,6 +52,12 @@ export class ViewerState {
 	}
 
 	async fetchGlobalResults() {
+		if (this.globalFetchAbortController) {
+			this.globalFetchAbortController.abort();
+		}
+		this.globalFetchAbortController = new AbortController();
+		const signal = this.globalFetchAbortController.signal;
+
 		try {
 			await Promise.all(this.axes.map(async ax => {
 				if (ax.variables.length === 0) {
@@ -61,18 +73,23 @@ export class ViewerState {
 						threshold: 1000,
 						xmin: null,
 						xmax: null,
+						csv_start_year: this.startYear,
 						csv_start_month: this.startMonth,
 						csv_start_day: this.startDay,
+						csv_end_year: this.endYear,
 						csv_end_month: this.endMonth,
 						csv_end_day: this.endDay
-					}
+					},
+					signal
 				});
-				if (data && typeof data === 'object' && 'data' in data) {
+				if (!signal.aborted && data && typeof data === 'object' && 'data' in data) {
 					this.globalChartData[ax.id] = (data as any).data;
 				}
 			}));
-		} catch (e) {
-			console.error("Failed to fetch global results", e);
+		} catch (e: any) {
+			if (e.name !== 'AbortError') {
+				console.error("Failed to fetch global results", e);
+			}
 		}
 	}
 
@@ -89,6 +106,12 @@ export class ViewerState {
 	}
 
 	async fetchResults() {
+		if (this.fetchAbortController) {
+			this.fetchAbortController.abort();
+		}
+		this.fetchAbortController = new AbortController();
+		const signal = this.fetchAbortController.signal;
+
 		this.loading = true;
 		try {
 			await Promise.all(this.axes.map(async ax => {
@@ -105,11 +128,14 @@ export class ViewerState {
 						threshold: 1200,
 						xmin: ax.xmin,
 						xmax: ax.xmax,
+						csv_start_year: this.startYear,
 						csv_start_month: this.startMonth,
 						csv_start_day: this.startDay,
+						csv_end_year: this.endYear,
 						csv_end_month: this.endMonth,
 						csv_end_day: this.endDay
-					}
+					},
+					signal
 				});
 				if (data && typeof data === 'object' && 'data' in data) {
 					this.chartData[ax.id] = (data as any).data;
@@ -136,7 +162,8 @@ export class ViewerState {
 			ymin: null,
 			ymax: null,
 			xmin: null,
-			xmax: null
+			xmax: null,
+			customYLabel: undefined
 		});
 	}
 
@@ -239,11 +266,25 @@ export class ViewerState {
 		}
 	}
 
+	resetAllZoom() {
+		this.axes.forEach(ax => {
+			ax.xmin = null;
+			ax.xmax = null;
+		});
+	}
+
 	setAxisXBounds(id: string, xmin: number | null, xmax: number | null) {
 		const ax = this.axes.find(a => a.id === id);
 		if (ax) {
 			ax.xmin = xmin;
 			ax.xmax = xmax;
+		}
+	}
+
+	setAxisCustomYLabel(id: string, label: string) {
+		const ax = this.axes.find(a => a.id === id);
+		if (ax) {
+			ax.customYLabel = label;
 		}
 	}
 

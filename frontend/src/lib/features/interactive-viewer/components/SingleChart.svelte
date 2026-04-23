@@ -9,48 +9,18 @@
 
 	let chartContainer: HTMLDivElement;
 	let chartInstance: echarts.ECharts | null = null;
+	let isMounted = $state(false);
 	let resizeObserver: ResizeObserver | null = null;
 	let zoomTimeout: ReturnType<typeof setTimeout> | undefined;
 
+	let editingYLabel = $state(false);
+	let editYLabelText = $state('');
+	let editYLabelPos = $state({ x: 0, y: 0 });
+	let isCopying = $state(false);
+
 	// Watch data and bounds to update chart
 	$effect(() => {
-		if (chartInstance && !viewerState.loading) {
-			updateChart();
-		}
-	});
-
-	// Re-init chart when container is ready
-	$effect(() => {
-		if (chartContainer) {
-			if (chartInstance) {
-				chartInstance.dispose();
-			}
-			chartInstance = echarts.init(chartContainer);
-
-			chartInstance.on('datazoom', (params: any) => {
-				clearTimeout(zoomTimeout);
-				zoomTimeout = setTimeout(() => {
-					const opt = chartInstance?.getOption() as any;
-					if (!opt || !opt.dataZoom || opt.dataZoom.length === 0) return;
-
-					let xStartMin = opt.dataZoom[0].startValue ?? opt.dataZoom[0].start;
-					let xEndMin = opt.dataZoom[0].endValue ?? opt.dataZoom[0].end;
-
-					if (xStartMin !== undefined && xEndMin !== undefined) {
-						let newMin = typeof xStartMin === 'number' ? xStartMin / 1440 : 0;
-						let newMax = typeof xEndMin === 'number' ? xEndMin / 1440 : viewerState.spanDays;
-
-						const currentMin = axis.xmin || 0;
-						const currentMax = axis.xmax || viewerState.spanDays;
-						// If user swept mouse more than 1 min differences
-						if (Math.abs(currentMin - newMin) > 0.01 || Math.abs(currentMax - newMax) > 0.01) {
-							viewerState.setAxisXBounds(axis.id, newMin, newMax);
-							viewerState.fetchResults();
-						}
-					}
-				}, 400);
-			});
-
+		if (isMounted && chartInstance && !viewerState.loading) {
 			updateChart();
 		}
 	});
@@ -61,6 +31,7 @@
 		const series: any[] = [];
 		const legendData: string[] = [];
 		const uniqueUnits = new Set<string>();
+		const refDate = new Date(Date.UTC(viewerState.startYear, 0, 1, 0, 0, 0));
 
 		// Add global background series to preserve full year shape in dataZoom
 		if (axis.variables.length > 0) {
@@ -73,7 +44,6 @@
 				series.push({
 					name: 'BackgroundDataZoom',
 					type: 'line',
-					sampling: 'lttb',
 					data: points,
 					showSymbol: false,
 					tooltip: { show: false },
@@ -118,7 +88,6 @@
 					symbol: chartType === 'scatter' ? customMarker : undefined,
 					symbolSize: chartType === 'scatter' ? 5 : undefined,
 					areaStyle: chartType === 'area' ? { opacity: 0.2 } : undefined,
-					sampling: 'none',
 					data: points,
 					connectNulls: false,
 					lineStyle: {
@@ -140,7 +109,7 @@
 
 		function getFormattedTime(value: number) {
 			const date = new Date(
-				Date.UTC(2023, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
+				Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
 			);
 			date.setUTCMinutes(value);
 			const month = date.getUTCMonth() + 1;
@@ -166,7 +135,7 @@
 						const val = p.value[1];
 						const formattedVal =
 							val !== null && val !== undefined
-								? val.toLocaleString('en-US', { maximumFractionDigits: 3 })
+								? val.toLocaleString('en-US', { maximumFractionDigits: 1 })
 								: '-';
 						// Skip background empty series if hovered
 						if (p.seriesName === 'BackgroundDataZoom') return;
@@ -185,6 +154,7 @@
 				textStyle: { color: mutedColor, fontWeight: 500 },
 				type: 'scroll',
 				top: 5,
+				height: 55,
 				icon: 'circle',
 				itemGap: 20
 			},
@@ -192,7 +162,7 @@
 				left: 90,
 				right: '5%',
 				bottom: 75,
-				top: '15%',
+				top: 85,
 				containLabel: false
 			},
 			xAxis: {
@@ -209,7 +179,7 @@
 					formatter: function (value: number) {
 						// Create reference date starting from selected global Month
 						const date = new Date(
-							Date.UTC(2023, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
+							Date.UTC(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay, 0, 0, 0)
 						);
 						date.setUTCMinutes(value);
 
@@ -237,12 +207,14 @@
 						}
 					}
 				},
+				axisLine: { onZero: false },
 				axisTick: { show: true },
 				splitLine: { show: true, lineStyle: { color: gridColor, type: 'dashed' } }
 			},
 			yAxis: {
 				type: 'value',
-				name: `Value${unitStr}`,
+				name: axis.customYLabel || `Value${unitStr}`,
+				triggerEvent: true,
 				nameLocation: 'middle',
 				nameGap: 75,
 				nameTextStyle: { color: mutedColor, fontSize: 13 },
@@ -255,50 +227,186 @@
 					align: 'right',
 					overflow: 'truncate',
 					formatter: function (value: number) {
-						return value.toLocaleString('en-US', { maximumFractionDigits: 3 });
+						return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 					}
 				},
 				axisTick: { show: true },
 				splitLine: { show: true, lineStyle: { color: gridColor } }
 			},
 			dataZoom: [
-				{
-					type: 'inside',
-					xAxisIndex: 0,
-					startValue: axis.xmin !== null ? axis.xmin * 1440 : undefined,
-					endValue: axis.xmax !== null ? axis.xmax * 1440 : undefined
-				},
-				{
-					type: 'slider',
-					xAxisIndex: 0,
-					bottom: 20,
-					height: 25,
-					borderColor: 'transparent',
-					textStyle: { color: mutedColor },
-					fillerColor: 'rgba(99,102,241,0.1)',
-					startValue: axis.xmin !== null ? axis.xmin * 1440 : undefined,
-					endValue: axis.xmax !== null ? axis.xmax * 1440 : undefined
-				}
-			],
+			{
+				type: 'inside',
+				xAxisIndex: 0,
+				startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
+				endValue:   axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
+			},
+			{
+				type: 'slider',
+				xAxisIndex: 0,
+				bottom: 20,
+				height: 25,
+				borderColor: 'transparent',
+				textStyle: { color: mutedColor },
+				fillerColor: 'rgba(99,102,241,0.1)',
+				startValue: axis.xmin !== null ? axis.xmin * viewerState.spanDays * 1440 : undefined,
+				endValue:   axis.xmax !== null ? axis.xmax * viewerState.spanDays * 1440 : undefined
+			}
+		],
 			series
 		};
+		console.log('CHART UPDATE OPTION:', series);
 
-		chartInstance.setOption(option, true);
+		chartInstance.setOption(option, { replaceMerge: ['series'] });
 	}
 
 	onMount(() => {
-		// chartInstance is managed by the $effect block for theme
-		// Handle resize
-		resizeObserver = new ResizeObserver(() => {
-			chartInstance?.resize();
-		});
-		resizeObserver.observe(chartContainer);
+		if (chartContainer) {
+			chartInstance = echarts.init(chartContainer);
+
+			chartInstance.on('datazoom', (params: any) => {
+				clearTimeout(zoomTimeout);
+				zoomTimeout = setTimeout(() => {
+					const opt = chartInstance?.getOption() as any;
+					if (!opt || !opt.dataZoom || opt.dataZoom.length === 0) return;
+
+					let xStartMin = opt.dataZoom[0].startValue ?? opt.dataZoom[0].start;
+					let xEndMin = opt.dataZoom[0].endValue ?? opt.dataZoom[0].end;
+
+					if (xStartMin !== undefined && xEndMin !== undefined) {
+						// Convert from minutes to 0–1 ratio
+						const totalMinutes = viewerState.spanDays * 1440;
+						let newMin = typeof xStartMin === 'number' ? xStartMin / totalMinutes : 0;
+						let newMax = typeof xEndMin  === 'number' ? xEndMin  / totalMinutes : 1;
+
+						const currentMin = axis.xmin ?? 0;
+						const currentMax = axis.xmax ?? 1;
+						// If user swept mouse more than 0.01 ratio differences
+						if (Math.abs(currentMin - newMin) > 0.001 || Math.abs(currentMax - newMax) > 0.001) {
+							viewerState.setAxisXBounds(axis.id, newMin, newMax);
+							viewerState.fetchResults();
+						}
+					}
+				}, 400);
+			});
+
+			chartInstance.on('click', (params: any) => {
+				// Only activate when clicking directly on the Y-axis name label
+				if (params.componentType === 'yAxis' && params.targetType === 'axisName') {
+					const opt = chartInstance?.getOption() as any;
+					const currentName = opt?.yAxis?.[0]?.name || '';
+					editYLabelText = axis.customYLabel || currentName;
+					editYLabelPos = { x: params.event.offsetX, y: params.event.offsetY };
+					editingYLabel = true;
+				}
+			});
+
+			isMounted = true;
+
+			// Handle resize
+			resizeObserver = new ResizeObserver(() => {
+				chartInstance?.resize();
+			});
+			resizeObserver.observe(chartContainer);
+		}
 
 		return () => {
 			if (resizeObserver) resizeObserver.disconnect();
 			chartInstance?.dispose();
 		};
 	});
+
+	async function generateExportBlob(type: 'png' | 'svg'): Promise<Blob> {
+		const hiddenDiv = document.createElement('div');
+		hiddenDiv.style.width = chartContainer.clientWidth + 'px';
+		hiddenDiv.style.height = chartContainer.clientHeight + 'px';
+
+		const isSvg = type === 'svg';
+		const hiddenChart = echarts.init(hiddenDiv, undefined, { renderer: isSvg ? 'svg' : 'canvas' });
+		
+		const opt = chartInstance!.getOption() as any;
+		opt.animation = false;
+		opt.backgroundColor = isSvg ? 'transparent' : '#ffffff';
+		
+		if (opt.dataZoom) {
+			opt.dataZoom = opt.dataZoom.filter((dz: any) => dz.type !== 'slider');
+		}
+		if (Array.isArray(opt.grid)) {
+			opt.grid[0].bottom = 40;
+		} else if (opt.grid) {
+			opt.grid.bottom = 40;
+		}
+
+		hiddenChart.setOption(opt);
+
+		let blob: Blob;
+		if (isSvg) {
+			const svgStr = hiddenChart.renderToSVGString();
+			blob = new Blob([svgStr], { type: 'image/svg+xml' });
+		} else {
+			const dataUrl = hiddenChart.getDataURL({ type: 'png', pixelRatio: 300 / 72, backgroundColor: '#fff' });
+			const res = await fetch(dataUrl);
+			blob = await res.blob();
+		}
+
+		hiddenChart.dispose();
+		return blob;
+	}
+
+	async function exportChart(type: 'png' | 'svg') {
+		if (!chartInstance) return;
+		const name = `chart_export.${type}`;
+		try {
+			const handle = await (window as any).showSaveFilePicker({
+				suggestedName: name,
+				types: [{
+					description: `${type.toUpperCase()} Image`,
+					accept: { [`image/${type}`]: [`.${type}`] }
+				}]
+			});
+			const writable = await handle.createWritable();
+			const blob = await generateExportBlob(type);
+			await writable.write(blob);
+			await writable.close();
+		} catch (err: any) {
+			if (err.name !== 'AbortError') {
+				if (err.message && err.message.includes('not a function')) {
+					fallbackDownload(type, name);
+				} else {
+					console.error('Export failed:', err);
+				}
+			}
+		}
+	}
+
+	async function fallbackDownload(type: 'png' | 'svg', filename: string) {
+		const blob = await generateExportBlob(type);
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+
+	async function copyChart() {
+		try {
+			isCopying = true;
+			const blob = await generateExportBlob('png');
+			const ClipboardItem = (window as any).ClipboardItem;
+			if (!ClipboardItem) {
+				throw new Error('ClipboardItem not supported');
+			}
+			const item = new ClipboardItem({ 'image/png': blob });
+			await navigator.clipboard.write([item]);
+			setTimeout(() => { isCopying = false; }, 1500);
+		} catch (err) {
+			console.error('Failed to copy image: ', err);
+			alert('Clipboard copy failed. Your browser might not support this feature.');
+			isCopying = false;
+		}
+	}
 </script>
 
 <div class="chart-wrapper">
@@ -313,7 +421,51 @@
 		class="chart-container"
 		style="visibility: {axis.variables.length > 0 ? 'visible' : 'hidden'}"
 	></div>
+	{#if axis.variables.length > 0}
+		<div class="export-buttons">
+			<button class="export-btn icon-btn" onclick={copyChart} title="Copy as PNG to Clipboard" aria-label="Copy to Clipboard">
+				{#if isCopying}
+					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+				{/if}
+			</button>
+			<button class="export-btn" onclick={() => exportChart('png')} title="Save as PNG (300 DPI)">PNG</button>
+			<button class="export-btn" onclick={() => exportChart('svg')} title="Save as SVG">SVG</button>
+		</div>
+	{/if}
+
+	{#if editingYLabel}
+		<input
+			type="text"
+			class="inline-ylabel-input"
+			bind:value={editYLabelText}
+			style="left: {editYLabelPos.x}px; top: {editYLabelPos.y}px;"
+			onblur={() => {
+				viewerState.setAxisCustomYLabel(axis.id, editYLabelText);
+				editingYLabel = false;
+				updateChart();
+			}}
+			onkeydown={(e) => {
+				if (e.key === 'Enter') {
+					viewerState.setAxisCustomYLabel(axis.id, editYLabelText);
+					editingYLabel = false;
+					updateChart();
+				} else if (e.key === 'Escape') {
+					editingYLabel = false;
+				}
+			}}
+			use:focusInput
+		/>
+	{/if}
 </div>
+
+<script lang="ts" module>
+	function focusInput(node: HTMLInputElement) {
+		node.focus();
+		node.select();
+	}
+</script>
 
 <style>
 	.chart-wrapper {
@@ -354,5 +506,48 @@
 		font-size: 14px;
 		font-weight: 500;
 		margin: 0;
+	}
+	.export-buttons {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		display: flex;
+		gap: 6px;
+		z-index: 10;
+	}
+	.export-btn {
+		background: white;
+		border: 1px solid var(--border-light);
+		border-radius: 6px;
+		padding: 4px 8px;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--text-muted-light);
+		cursor: pointer;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+		transition: all 0.2s;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.export-btn:hover {
+		background: var(--bg-hover);
+		color: var(--primary-color, #6366f1);
+		border-color: var(--primary-color, #6366f1);
+	}
+	.inline-ylabel-input {
+		position: absolute;
+		transform: translate(-50%, -50%) rotate(-90deg);
+		z-index: 20;
+		background: white;
+		border: 1px solid var(--primary-color, #6366f1);
+		border-radius: 4px;
+		padding: 4px 8px;
+		font-size: 13px;
+		color: var(--text-color, #1e293b);
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		outline: none;
+		min-width: 150px;
+		text-align: center;
 	}
 </style>

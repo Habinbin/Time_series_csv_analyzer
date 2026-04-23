@@ -15,7 +15,18 @@ async def get_results(req: schemas.DownsampledResultRequest):
     """
     Fetch downsampled results using LTTB algorithm.
     """
-    data = service.get_downsampled_data(req.variables, req.threshold, req.xmin, req.xmax, req.csv_start_month, req.csv_end_month, req.csv_start_day, req.csv_end_day)
+    data = service.get_downsampled_data(
+        variables=req.variables,
+        threshold=req.threshold,
+        xmin=req.xmin,
+        xmax=req.xmax,
+        csv_start_year=req.csv_start_year,
+        csv_start_month=req.csv_start_month,
+        csv_start_day=req.csv_start_day,
+        csv_end_year=req.csv_end_year,
+        csv_end_month=req.csv_end_month,
+        csv_end_day=req.csv_end_day,
+    )
     return {"data": data}
 
 @router.post("/upload_csv", operation_id="simulation_upload_csv")

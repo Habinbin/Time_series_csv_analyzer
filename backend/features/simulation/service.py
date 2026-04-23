@@ -12,12 +12,24 @@ def get_variables():
         return []
     
     conn = sqlite3.connect(DB_PATH)
-    # Read just the column names (0 rows)
-    df = pd.read_sql("SELECT * FROM ashpb_pv_ess_1yr LIMIT 0", conn)
+    # Read the table schema to identify column types
+    schema_df = pd.read_sql("PRAGMA table_info(ashpb_pv_ess_1yr)", conn)
     conn.close()
     
+    if schema_df.empty:
+        return []
+
+    # Filter out columns that are text-based (like Date/Time)
+    numeric_cols = []
+    for _, row in schema_df.iterrows():
+        col_name = row['name']
+        col_type = str(row['type']).upper()
+        # pandas to_sql typically maps to TEXT, REAL, INTEGER
+        if not ('TEXT' in col_type or 'VARCHAR' in col_type or 'CHAR' in col_type or 'BLOB' in col_type):
+            numeric_cols.append(col_name)
+    
     vars_info = []
-    for col in df.columns:
+    for col in numeric_cols:
         if "[" in col and "]" in col:
             name, unit_str = col.split("[", 1)
             name = name.strip()
@@ -30,10 +42,14 @@ def get_variables():
 
 import datetime
 
-def get_downsampled_data(variables: list[str], threshold: int, xmin: float | None = None, xmax: float | None = None, csv_start_month: int = 1, csv_end_month: int = 12, csv_start_day: int = 1, csv_end_day: int = 31):
+def get_downsampled_data(variables: list[str], threshold: int, xmin: float | None = None, xmax: float | None = None, csv_start_year: int = 2025, csv_start_month: int = 1, csv_start_day: int = 1, csv_end_year: int = 2025, csv_end_month: int = 12, csv_end_day: int = 31) -> dict:
     """
-    Reads the requests variables from SQLite and applies LTTB downsampling.
-    If requested points < threshold, no downsampling is needed.
+    Reads the requested variables from SQLite and applies LTTB downsampling.
+
+    xmin / xmax are fractional ratios in [0.0, 1.0] representing the slice
+    position within the *entire* dataset (n_total rows). They are completely
+    independent of the date-range parameters, which are used only to compute
+    the X-axis label scale (minutes_per_point).
     """
     if not DB_PATH.exists():
         return {}
@@ -53,22 +69,18 @@ def get_downsampled_data(variables: list[str], threshold: int, xmin: float | Non
     cursor.execute("SELECT COUNT(*) FROM ashpb_pv_ess_1yr")
     n_total = cursor.fetchone()[0]
     
-    # Calculate span in days between start and end date (inclusive) using a non-leap year (2023)
+    # Calculate span_days: used ONLY for X-axis label scaling, not for slicing.
     try:
-        st_date = datetime.datetime(2023, csv_start_month, csv_start_day)
-        en_date = datetime.datetime(2023, csv_end_month, csv_end_day)
+        st_date = datetime.datetime(csv_start_year, csv_start_month, csv_start_day)
+        en_date = datetime.datetime(csv_end_year, csv_end_month, csv_end_day)
         span_days = max(1, (en_date - st_date).days + 1)
     except ValueError:
-        span_days = 365 # Default fallback on invalid date
-    
-    points_per_day = n_total / float(span_days)
-    
-    min_idx = int(xmin * points_per_day) if xmin is not None else 0
-    max_idx = int(xmax * points_per_day) if xmax is not None else n_total
-    
-    # Ensure bounds
-    min_idx = max(0, min_idx)
-    max_idx = min(n_total, max_idx)
+        span_days = 365  # Default fallback on invalid date
+
+    # xmin / xmax are 0.0–1.0 ratios of the *full* dataset.
+    # Slicing is always relative to n_total, never to span_days.
+    min_idx = max(0, int(xmin * n_total)) if xmin is not None else 0
+    max_idx = min(n_total, int(xmax * n_total)) if xmax is not None else n_total
     
     if min_idx < max_idx:
         # Avoid loading everything! Load only targeted rowids (1-indexed in SQLite)
@@ -91,8 +103,12 @@ def get_downsampled_data(variables: list[str], threshold: int, xmin: float | Non
     else:
         use_lttb = True
 
-    # The frontend expects X axis values as minutes.
-    minutes_per_point = 1440.0 / points_per_day
+    # Map each row to a minute value on the X axis.
+    # total_minutes = the full date-range span expressed in minutes so that
+    # the X-axis labels (formatted from startDate) align correctly regardless
+    # of the actual data density.
+    total_minutes = span_days * 1440.0
+    minutes_per_point = total_minutes / n_total if n_total > 0 else 1.0
     
     # Time array (X axis) proxy - convert rowid to conceptual simulation minutes
     if n_rows > 0:

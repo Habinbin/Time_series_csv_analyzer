@@ -40,14 +40,16 @@
 	}
 
 	function validateAndFetch() {
-		const startDate = new Date(2023, viewerState.startMonth - 1, viewerState.startDay);
-		let endDate = new Date(2023, viewerState.endMonth - 1, viewerState.endDay);
+		const startDate = new Date(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay);
+		let endDate = new Date(viewerState.endYear, viewerState.endMonth - 1, viewerState.endDay);
 		
 		if (startDate >= endDate) {
-			endDate = new Date(2023, viewerState.startMonth - 1, viewerState.startDay + 1);
+			endDate = new Date(viewerState.startYear, viewerState.startMonth - 1, viewerState.startDay + 1);
+			viewerState.endYear = endDate.getFullYear();
 			viewerState.endMonth = endDate.getMonth() + 1;
 			viewerState.endDay = endDate.getDate();
 		}
+		viewerState.resetAllZoom();
 		viewerState.fetchGlobalResults().then(() => viewerState.fetchResults());
 	}
 </script>
@@ -65,7 +67,7 @@
 			<div class="drag-message">
 				<div class="icon">📄</div>
 				<h2>Replace Simulation Datastore</h2>
-				<p>Drop your 1-yr Simulation CSV here to analyze</p>
+				<p>Drop your Simulation CSV here to analyze</p>
 			</div>
 		</div>
 	{/if}
@@ -85,14 +87,19 @@
 			<label class="timestep-input">
 				<span>Start:</span>
 				<div class="date-selects">
+					<select bind:value={viewerState.startYear} onchange={validateAndFetch}>
+						{#each Array.from({length: 21}, (_, i) => 2010 + i) as y}
+							<option value={y}>{y}</option>
+						{/each}
+					</select>
 					<select bind:value={viewerState.startMonth} onchange={validateAndFetch}>
 						{#each Array.from({length: 12}, (_, i) => i + 1) as m}
-							<option value={m}>{m}월</option>
+							<option value={m}>{m}m</option>
 						{/each}
 					</select>
 					<select bind:value={viewerState.startDay} onchange={validateAndFetch}>
 						{#each Array.from({length: 31}, (_, i) => i + 1) as d}
-							<option value={d}>{d}일</option>
+							<option value={d}>{d}d</option>
 						{/each}
 					</select>
 				</div>
@@ -100,14 +107,19 @@
 			<label class="timestep-input">
 				<span>End:</span>
 				<div class="date-selects">
+					<select bind:value={viewerState.endYear} onchange={validateAndFetch}>
+						{#each Array.from({length: 21}, (_, i) => 2010 + i) as y}
+							<option value={y}>{y}</option>
+						{/each}
+					</select>
 					<select bind:value={viewerState.endMonth} onchange={validateAndFetch}>
 						{#each Array.from({length: 12}, (_, i) => i + 1) as m}
-							<option value={m}>{m}월</option>
+							<option value={m}>{m}m</option>
 						{/each}
 					</select>
 					<select bind:value={viewerState.endDay} onchange={validateAndFetch}>
 						{#each Array.from({length: 31}, (_, i) => i + 1) as d}
-							<option value={d}>{d}일</option>
+							<option value={d}>{d}d</option>
 						{/each}
 					</select>
 				</div>
