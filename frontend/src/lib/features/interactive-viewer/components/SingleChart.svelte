@@ -51,12 +51,16 @@
 				series.push({
 					name: 'BackgroundDataZoom',
 					type: 'line',
+					sampling: 'lttb',
+					large: true,
+					largeThreshold: 600,
 					data: points,
 					showSymbol: false,
 					tooltip: { show: false },
 					lineStyle: { opacity: 0 },
 					itemStyle: { opacity: 0 },
 					animation: false,
+					hoverAnimation: false,
 					silent: true
 				});
 			}

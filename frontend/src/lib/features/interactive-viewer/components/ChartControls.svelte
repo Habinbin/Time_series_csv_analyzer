@@ -647,21 +647,7 @@
 		transition: opacity 0.15s ease, transform 0.15s ease;
 		z-index: 999;
 	}
-	.has-tooltip::before {
-		content: '';
-		position: absolute;
-		bottom: calc(100% + 1px);
-		left: 50%;
-		transform: translateX(-50%);
-		border: 5px solid transparent;
-		border-top-color: rgba(15, 23, 42, 0.88);
-		pointer-events: none;
-		opacity: 0;
-		transition: opacity 0.15s ease;
-		z-index: 999;
-	}
-	.has-tooltip:hover::after,
-	.has-tooltip:hover::before {
+	.has-tooltip:hover::after {
 		opacity: 1;
 		transform: translateX(-50%) scale(1);
 	}
